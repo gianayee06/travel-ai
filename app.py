@@ -2,6 +2,9 @@
 import streamlit as st
 from datetime import date, datetime, timedelta
 
+from api_helpers import *
+import json
+
 # ---------- PAGE CONFIG ----------
 st.set_page_config(page_title="TravelBuddy AI", page_icon="✈️", layout="wide")
 
@@ -214,45 +217,46 @@ with st.expander("🔗 Connect Google (demo)"):
         st.info("Google account connected (demo).")
 
 # ---------- FAKE BACKEND ----------
-def fake_plan_trip(payload: dict):
-    s = datetime.fromisoformat(payload["start_date"])
-    e = datetime.fromisoformat(payload["end_date"])
-    days = (e - s).days + 1
+def plan_trip(payload: dict):
+    """
+    Uses backend AI helper functions to generate real trip data
+    (flights, hotels, and itinerary) from user input.
+    """
+    try:
+        # 1️⃣ Ensure all expected keys are properly formatted
+        backend_payload = {
+            "origin": payload.get("origin", "Toronto"),  # default if user didn’t specify
+            "destination": payload["destination"].strip(),
+            "startDate": payload["start_date"],
+            "endDate": payload["end_date"],
+            "travelers": int(payload.get("travelers", 1)),
+            "budget": float(payload.get("budget", 1000)),
+            "mood": payload.get("mood", "balanced"),
+            "pace": payload.get("pace", "balanced"),
+            "econ": payload.get("eco_mode", False),
+        }
 
-    mood = payload.get("mood", "balanced")
-    eco = payload.get("eco_mode", False)
+        # 2️⃣ Call backend AI helper functions
+        flights_raw = get_flight_data(backend_payload)
+        hotels_raw = get_hotel_data(backend_payload)
+        itinerary_raw = get_itinerary_data(backend_payload)
 
-    mood_line = {
-        "relax": "slower mornings and chill activities.",
-        "adventure": "outdoor experiences and high-energy highlights.",
-        "culture": "museums, neighborhoods, and authentic food spots.",
-        "romantic": "cozy dining and scenic walks.",
-        "surprise": "a playful mix of hidden gems!",
-        "balanced": "a balanced blend of highlights."
-    }.get(mood, "a balanced blend of highlights.")
+        # 3️⃣ Try parsing JSON strings from the backend (if returned that way)
+        flights = json.loads(flights_raw) if isinstance(flights_raw, str) else flights_raw
+        hotels = json.loads(hotels_raw) if isinstance(hotels_raw, str) else hotels_raw
+        itinerary = json.loads(itinerary_raw) if isinstance(itinerary_raw, str) else itinerary_raw
 
-    tips = ["Book tickets ahead", "Stay near transit"]
-    if eco:
-        tips.insert(0, "Prefer public transit and eco-stays to earn EcoPoints")
+        # 4️⃣ Combine everything into a single dictionary
+        return {
+            "destination": backend_payload["destination"],
+            "summary": f"{backend_payload['mood'].capitalize()} trip from {backend_payload['origin']} to {backend_payload['destination']}",
+            "flights": flights,
+            "hotels": hotels,
+            "itinerary": itinerary,
+        }
 
-    daily = []
-    for i in range(days):
-        d = s + timedelta(days=i)
-        acts = [
-            {"time": "09:00", "name": "Breakfast", "note": "Local cafe", "cost": 12},
-            {"time": "10:30", "name": "Main attraction", "note": "", "cost": 20},
-        ]
-        if mood in ("adventure", "surprise"):
-            acts.append({"time": "15:00", "name": "Optional hike / activity", "note": "", "cost": 0})
-        daily.append({"date": d.date().isoformat(), "title": f"Day {i+1} in {payload['destination']}", "activities": acts})
-
-    return {
-        "destination": payload["destination"],
-        "summary": f"{days}-day {payload['pace']} trip with {mood_line}",
-        "daily": daily,
-        "estimated_total_cost": payload["budget"],
-        "tips": tips,
-    }
+    except Exception as e:
+        return {"error": f"Failed to generate trip data: {str(e)}"}
 
 # ---------- FORM ----------
 with st.form("planner"):
@@ -303,7 +307,7 @@ if submitted:
             "eco_mode": st.session_state.eco_mode,
         }
         with st.spinner("Planning your trip..."):
-            st.session_state.results = fake_plan_trip(payload)
+            st.session_state.results = plan_trip(payload)
 
 # ---------- LOCAL CONTRIBUTOR (opened by a button below the form) ----------
 lc_container = st.container()
