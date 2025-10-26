@@ -76,16 +76,41 @@ def analyze_sentiment(text: str) -> str:
     return generate_text(prompt, temperature=0.0)
 
 
-# -------- TRAVEL ITINERARY GENERATOR --------
-# Takes a destination string and returns a fun 3-day itinerary
-def generate_trip_idea(destination: str) -> str:
-    prompt = f"Suggest a fun 3-day travel itinerary for {destination}."
-    return generate_text(prompt, temperature=0.9)
-
 
 # -------- ECO-FRIENDLY FLIGHT OPTIONS --------
 # Takes origin, destination, date, if client is eco-friendly and returns flight options
-def generate_flight_options(origin: str, destination: str, date: str, econ: bool = False) -> str:
+def generate_flight_options(
+    origin: str,
+    destination: str,
+    startDate: str,
+    endDate: str,
+    travelers: int,
+    budget: float,
+    mood: str,
+    pace: str,
+    econ: bool = False
+) -> str:
+    """
+    Uses OpenAI to suggest flight options based on user preferences.
+
+    Parameters:
+    - origin (str): Departure city or airport code.
+    - destination (str): Arrival city or airport code.
+    - startDate (str): Departure date (YYYY-MM-DD).
+    - endDate (str): Return date (YYYY-MM-DD).
+    - travelers (int): Number of people traveling.
+    - budget (float): Total trip budget in USD.
+    - mood (str): Overall vibe of the trip. 
+        Options: "balanced", "relaxed", "adventure", "culture", "romantic", "surprise".
+    - pace (str): How busy the trip should feel. 
+        Options: "relaxed", "balanced", "packed".
+    - econ (bool): If True, prioritize eco-friendly flight options.
+
+    Returns:
+    - str: AI-generated list of flight suggestions.
+    """
+
+    # Choose how to sort flight options
     if econ:
         sort_instruction = (
             "List the most eco-friendly flight options first (based on lower CO₂ emissions), "
@@ -94,13 +119,176 @@ def generate_flight_options(origin: str, destination: str, date: str, econ: bool
     else:
         sort_instruction = "List all flight options from cheapest to most expensive."
 
+    # Craft AI prompt dynamically
     prompt = f"""
-    You are a travel assistant. Find flight options from {origin} to {destination} on {date}.
-    Include airline name, departure time, arrival time, and estimated price in USD.
+    You are a travel assistant helping plan flights for a {mood} trip with a {pace} pace.
+
+    Traveler details:
+    - Origin: {origin}
+    - Destination: {destination}
+    - Dates: Depart on {startDate}, return on {endDate}
+    - Number of travelers: {travelers}
+    - Total budget: ${budget} USD
+    - Mood: {mood}
+    - Pace: {pace}
+
+    Please suggest flight options that best fit these preferences.
+    Include:
+    - Airline name
+    - Departure time
+    - Arrival time
+    - Estimated price in USD
+    - A short note on why this option matches the traveler's {mood} mood and {pace} pace
+
     {sort_instruction}
-    Return the results in a neat, numbered list.
+
+    Return results as a neat, numbered list (1., 2., 3., etc.).
     """
-    return generate_text(prompt, temperature=0.4)
+
+    # Generate using your helper
+    return generate_text(prompt, temperature=0.5)
+
+
+def generate_hotel_options(
+    origin: str,
+    destination: str,
+    startDate: str,
+    endDate: str,
+    travelers: int,
+    budget: float,
+    mood: str,
+    pace: str,
+    econ: bool = False
+) -> str:
+    """
+    Uses OpenAI to suggest hotel options that fit the user's preferences and total trip budget.
+
+    Parameters:
+    - origin (str): Departure city or airport code.
+    - destination (str): City where the hotel will be booked.
+    - startDate (str): Check-in date (YYYY-MM-DD).
+    - endDate (str): Check-out date (YYYY-MM-DD).
+    - travelers (int): Number of people traveling.
+    - budget (float): Total trip budget in USD (includes both flight + hotel).
+    - mood (str): Trip theme. Options: "balanced", "relaxed", "adventure", "culture", "romantic", "surprise".
+    - pace (str): Trip intensity. Options: "relaxed", "balanced", "packed".
+    - econ (bool): If True, prioritize eco-friendly accommodations.
+
+    Returns:
+    - str: AI-generated list of hotel suggestions.
+    """
+
+    if econ:
+        eco_instruction = (
+            "Prefer eco-certified or sustainable hotels that use renewable energy or have green initiatives."
+        )
+    else:
+        eco_instruction = "Eco-friendliness is not a priority."
+
+    # Dynamic prompt with budgeting logic
+    prompt = f"""
+    You are a travel assistant helping select hotels in {destination} for a {mood} trip with a {pace} pace.
+
+    The total trip budget (including both flights and hotel) is ${budget} USD.
+    Assume the travelers have already spent approximately 60% of the budget on flights.
+    The remaining 40% should cover hotels and must not exceed it.
+
+    Traveler details:
+    - Destination: {destination}
+    - Origin: {origin}
+    - Dates: Check-in {startDate}, check-out {endDate}
+    - Number of travelers: {travelers}
+    - Mood: {mood}
+    - Pace: {pace}
+
+    Please recommend hotels that fit these preferences and budget constraints.
+    Include:
+    - Hotel name
+    - Star rating or property type
+    - Neighborhood or location vibe
+    - Price per night in USD and total estimated stay cost
+    - Short note explaining how it matches the {mood} mood and {pace} pace
+    - Mention eco-friendliness if relevant
+
+    {eco_instruction}
+
+    Return results as a clean, numbered list (1., 2., 3., etc.).
+    """
+
+    return generate_text(prompt, temperature=0.6)
+
+
+def generate_itinerary(
+    origin: str,
+    destination: str,
+    startDate: str,
+    endDate: str,
+    travelers: int,
+    budget: float,
+    mood: str,
+    pace: str,
+    econ: bool = False
+) -> str:
+    """
+    Uses OpenAI to generate a personalized travel itinerary based on trip parameters.
+
+    Parameters:
+    - origin (str): Departure city or airport code.
+    - destination (str): Trip destination city.
+    - startDate (str): Start date of the trip (YYYY-MM-DD).
+    - endDate (str): End date of the trip (YYYY-MM-DD).
+    - travelers (int): Number of travelers.
+    - budget (float): Total budget in USD (includes flights + hotels + activities).
+    - mood (str): Trip theme. Options: "balanced", "relaxed", "adventure", "culture", "romantic", "surprise".
+    - pace (str): Trip intensity. Options: "relaxed", "balanced", "packed".
+    - econ (bool): If True, prefer sustainable or local experiences.
+
+    Returns:
+    - str: AI-generated daily itinerary in text format.
+    """
+
+    if econ:
+        eco_instruction = (
+            "Prioritize sustainable activities such as local tours, walking experiences, or nature-friendly options."
+        )
+    else:
+        eco_instruction = "Eco-friendliness is optional but still appreciated."
+
+    # Budget logic
+    # Assume flights and hotels consume about 80% of total budget.
+    # Only ~20% remains for activities, food, and attractions.
+    activity_budget = budget * 0.2
+
+    # AI prompt for itinerary generation
+    prompt = f"""
+    You are a travel assistant helping plan a {mood} trip with a {pace} pace to {destination}.
+
+    Trip details:
+    - Origin: {origin}
+    - Destination: {destination}
+    - Dates: {startDate} to {endDate}
+    - Number of travelers: {travelers}
+    - Total budget: ${budget} USD (including flights, hotels, and activities)
+    - Remaining budget for activities and experiences: ${activity_budget:.2f} USD
+    - Mood: {mood}
+    - Pace: {pace}
+
+    Create a detailed daily itinerary that fits the {mood} and {pace} style.
+    Include:
+    - Morning, afternoon, and evening plans for each day
+    - Approximate cost per day in USD (must stay under total remaining budget)
+    - Mix of sightseeing, dining, and relaxation appropriate to the trip mood
+    - Mention eco-friendly or local experiences if relevant
+    - Avoid repeating similar activities
+
+    {eco_instruction}
+
+    Return the itinerary as a clean, day-by-day schedule (Day 1, Day 2, etc.).
+    """
+
+    return generate_text(prompt, temperature=0.7)
+
+
 
 
 # ------------------ TEST THE FILE DIRECTLY -------------------
@@ -109,6 +297,15 @@ def generate_flight_options(origin: str, destination: str, date: str, econ: bool
 # in the terminal.
 # It lets you quickly test the functions before integrating them into your app.
 if __name__ == "__main__":
-    sample = "I love coding with my teammates, it makes learning fun!" # this is the prompt text
-    print("Summary:", summarize_text(sample))
-    print("Sentiment:", analyze_sentiment(sample))
+    itinerary = generate_itinerary(
+        origin="San Francisco",
+        destination="Lisbon",
+        startDate="2025-06-01",
+        endDate="2025-06-10",
+        travelers=2,
+        budget=4000,
+        mood="romantic",
+        pace="balanced",
+        econ=True
+    )
+    print(itinerary)
