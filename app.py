@@ -6,7 +6,78 @@ from api_helpers import get_flight_data, get_hotel_data, get_itinerary_data
 import re
 from typing import Optional
 
+# --- Utility: Split text blocks ---
+def _split_options(md_text: str, keyword: str) -> list[str]:
+    """
+    Split text into blocks based on a keyword (like 'Airline:' or 'Area:').
+    Returns a list of sections for each option.
+    """
+    if not md_text:
+        return []
+    lines = md_text.strip().split("\n")
+    blocks, current = [], []
+    for line in lines:
+        if line.strip().startswith(keyword) and current:
+            blocks.append("\n".join(current).strip())
+            current = [line]
+        else:
+            current.append(line)
+    if current:
+        blocks.append("\n".join(current).strip())
+    return [b for b in blocks if keyword in b]
 
+
+# --- Renderer for Flights with "Book" button ---
+def render_flights_with_buttons(md_text: str):
+    options = _split_options(md_text, "Airline:")
+    if not options:
+        st.markdown(md_text or "_No results yet._")
+        return
+
+    st.markdown("### Flight Options")
+    for i, option in enumerate(options, start=1):
+        st.markdown(f"##### Option {i}")
+        st.markdown(option)
+        st.button(f"Book Flight {i}", key=f"book_flight_{i}")
+        st.markdown("---")
+
+
+# --- Renderer for Hotels with "Book" button ---
+def render_hotels_with_buttons(md_text: str):
+    options = _split_options(md_text, "Area:")
+    if not options:
+        st.markdown(md_text or "_No results yet._")
+        return
+
+    st.markdown("### Hotel Options")
+    for i, option in enumerate(options, start=1):
+        st.markdown(f"##### Option {i}")
+        st.markdown(option)
+        st.button(f"Book Hotel {i}", key=f"book_hotel_{i}")
+        st.markdown("---")
+
+
+_HOTEL_BLOCK = re.compile(
+    r"(?P<name>[A-Z][^\n]+)\n\nArea:\s*(?P<area>[^\n]+)\nNightly Price:\s*\$?\s*(?P<price>\d+[.,]?\d*)",
+    re.IGNORECASE
+)
+
+def _parse_hotels(md: str):
+    """
+    Returns a list of hotels from the model text:
+    [{'name': 'Fairmont Banff Springs', 'area': 'Banff', 'nightly': 400.0}, ...]
+    """
+    hotels = []
+    for m in _HOTEL_BLOCK.finditer(md or ""):
+        try:
+            hotels.append({
+                "name": m.group("name").strip(),
+                "area": m.group("area").strip(),
+                "nightly": float(m.group("price").replace(",", "")),
+            })
+        except Exception:
+            continue
+    return hotels
 
 
 def back_to_home():
@@ -96,7 +167,7 @@ def plan_form():
         with c5:
             travelers = st.number_input("Travelers", min_value=1, value=1, step=1)
         with c6:
-            budget = st.number_input("Budget (USD)", min_value=100.0, value=2000.0, step=100.0)
+            budget = st.number_input("Budget (CAD)", min_value=100.0, value=2000.0, step=100.0)
         with c7:
             mood = st.selectbox("Mood", ["balanced", "adventurous", "relaxed", "romantic", "family"], index=0)
         with c8:
@@ -111,29 +182,53 @@ def plan_form():
             "travelers": travelers, "budget": budget,
             "mood": mood, "pace": pace, "econ": st.session_state.eco_mode,
         }
+
         with st.spinner("Thinking up options..."):
+            # 1. Generate flights & hotels
             flights_md = get_flight_data(params)
             hotels_md  = get_hotel_data(params)
 
-            # Parse prices from model output
+            # 2. Parse cheapest flight + hotel data
             min_flight_total = _extract_min_price(flights_md)
-            min_nightly      = _extract_min_nightly(hotels_md)
+            hotel_list = _parse_hotels(hotels_md)
 
-            # Generate itinerary with price guardrails
+            # 3. Compute remaining budget for hotels
+            flight_cost = (min_flight_total or 0) * travelers
+            nights = (end - start).days or 1
+            remaining_budget = budget - flight_cost
+            max_nightly = remaining_budget / nights if remaining_budget > 0 else None
+
+            # Pick the priciest hotel still within remaining budget
+            chosen_hotel = None
+            if hotel_list and max_nightly:
+                valid = [h for h in hotel_list if h["nightly"] <= max_nightly]
+                if valid:
+                    chosen_hotel = max(valid, key=lambda h: h["nightly"])
+
+            # 4. Build parameters for itinerary generation
             itin_params = dict(params)
             itin_params["flight_price_total"] = float(min_flight_total) if min_flight_total else None
-            itin_params["nightly_price_cap"]  = float(min_nightly) if min_nightly else None
+            itin_params["nightly_price_cap"]  = float(chosen_hotel["nightly"]) if chosen_hotel else None
+            itin_params["chosen_hotel_name"]  = chosen_hotel["name"] if chosen_hotel else None
+
+            # 5. Generate itinerary
             itinerary_md = get_itinerary_data(itin_params)
 
             st.session_state.results["flights"]   = flights_md
             st.session_state.results["hotels"]    = hotels_md
             st.session_state.results["itinerary"] = itinerary_md
 
-        add_points("review", 1)  # small reward for planning
+        add_points("review", 1)
+
 
 
 def page_home():
+    
     plan_form()
+
+
+    
+
     r = st.session_state.results
     if any(r.values()):
         st.markdown("## Your AI Travel Plan")
