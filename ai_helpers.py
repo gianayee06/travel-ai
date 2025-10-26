@@ -6,7 +6,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # create openAI client using API key
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = OpenAI(
+    api_key=os.getenv("OPENAI_API_KEY"),
+    project=os.getenv("OPENAI_PROJECT_ID")
+)
 
 
 # connects our app to openAI
