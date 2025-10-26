@@ -5,12 +5,10 @@ from typing import Optional
 import re
 import traceback
 
-# ---- External helpers (your existing module) ----
+# External helpers (your existing module) 
 from api_helpers import get_flight_data, get_hotel_data, get_itinerary_data
 
-# =========================
 # Utilities
-# =========================
 def _split_options(md_text: str, keyword: str) -> list[str]:
     """
     Split text into blocks based on a keyword (like 'Airline:' or 'Area:').
@@ -103,9 +101,8 @@ def _extract_min_nightly(text: str) -> Optional[float]:
 def back_to_home():
     st.session_state.page = "Home"
 
-# =========================
+
 # App State & Config
-# =========================
 st.set_page_config(page_title="TravelBuddy AI", page_icon="✈️", layout="wide")
 
 def init_state():
@@ -130,9 +127,8 @@ def add_points(kind: str, qty: int = 1):
     multiplier = 1.5 if st.session_state.get("eco_mode") else 1.0
     st.session_state.points += int(base * multiplier)
 
-# =========================
+
 # UI Components
-# =========================
 def topbar():
     cols = st.columns([6,1,1,1])
     with cols[0]:
