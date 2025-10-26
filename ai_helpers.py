@@ -73,6 +73,32 @@ def analyze_sentiment(text: str) -> str:
     return generate_text(prompt, temperature=0.0)
 
 
+# -------- TRAVEL ITINERARY GENERATOR --------
+# Takes a destination string and returns a fun 3-day itinerary
+def generate_trip_idea(destination: str) -> str:
+    prompt = f"Suggest a fun 3-day travel itinerary for {destination}."
+    return generate_text(prompt, temperature=0.9)
+
+
+# -------- ECO-FRIENDLY FLIGHT OPTIONS --------
+# Takes origin, destination, date, if client is eco-friendly and returns flight options
+def generate_flight_options(origin: str, destination: str, date: str, econ: bool = False) -> str:
+    if econ:
+        sort_instruction = (
+            "List the most eco-friendly flight options first (based on lower CO₂ emissions), "
+            "then the rest ordered from cheapest to most expensive."
+        )
+    else:
+        sort_instruction = "List all flight options from cheapest to most expensive."
+
+    prompt = f"""
+    You are a travel assistant. Find flight options from {origin} to {destination} on {date}.
+    Include airline name, departure time, arrival time, and estimated price in USD.
+    {sort_instruction}
+    Return the results in a neat, numbered list.
+    """
+    return generate_text(prompt, temperature=0.4)
+
 
 # ------------------ TEST THE FILE DIRECTLY -------------------
 # This section runs only when you type:
@@ -80,6 +106,6 @@ def analyze_sentiment(text: str) -> str:
 # in the terminal.
 # It lets you quickly test the functions before integrating them into your app.
 if __name__ == "__main__":
-    sample = "I love coding with my teammates, it makes learning fun!"
+    sample = "I love coding with my teammates, it makes learning fun!" # this is the prompt text
     print("Summary:", summarize_text(sample))
     print("Sentiment:", analyze_sentiment(sample))
