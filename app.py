@@ -8,6 +8,11 @@ from typing import Optional
 
 
 
+
+def back_to_home():
+    """Return user to the Home page."""
+    st.session_state.page = "Home"
+
 _MONEY = re.compile(r"\$\s*([\d,]+(?:\.\d{1,2})?)")
 
 def _extract_min_price(text: str) -> Optional[float]:
@@ -154,15 +159,24 @@ def page_points():
     st.markdown("### 🏆 Your Points")
     pts = st.session_state.points
     st.metric("Total Points", pts)
-    st.caption(f"Estimated value: ${pts*POINT_TO_DOLLAR:.2f} in credits")
+    st.caption(f"Estimated value: ${pts * POINT_TO_DOLLAR:.2f} in credits")
+
+    st.markdown("---")
+    if st.button("Back to Home"):
+        back_to_home()
 
 
 def page_profile():
     st.markdown("### 👤 Profile")
-    st.write("Signed in:", "Yes" if st.session_state.user_authenticated else "Guest")
-    st.write("Eco mode:", "On" if st.session_state.eco_mode else "Off")
+    st.write("Signed in:", "✅ Yes" if st.session_state.user_authenticated else "👤 Guest")
+    st.write("Eco mode:", "🌿 On" if st.session_state.eco_mode else "Off")
     st.write("Mood:", st.session_state.mood)
     st.write("Pace:", st.session_state.pace)
+
+    st.markdown("---")
+    if st.button("Back to Home"):
+        back_to_home()
+
 
 def router():
     if st.session_state.page == "Home":
