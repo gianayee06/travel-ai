@@ -44,4 +44,6 @@ def get_itinerary_data(params: Dict) -> str:
         mood=params.get("mood", "balanced"),
         pace=params.get("pace", "balanced"),
         econ=bool(params.get("econ", False)),
+        flight_price_total=params.get("flight_price_total"),
+        nightly_price_cap=params.get("nightly_price_cap"),
     )

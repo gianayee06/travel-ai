@@ -3,6 +3,38 @@ import streamlit as st
 from datetime import date
 from api_helpers import get_flight_data, get_hotel_data, get_itinerary_data
 
+import re
+from typing import Optional
+
+
+
+_MONEY = re.compile(r"\$\s*([\d,]+(?:\.\d{1,2})?)")
+
+def _extract_min_price(text: str) -> Optional[float]:
+    """Find the lowest $ amount in a block of text."""
+    nums = []
+    for m in _MONEY.finditer(text or ""):
+        val = float(m.group(1).replace(",", ""))
+        nums.append(val)
+    return min(nums) if nums else None
+
+def _extract_min_nightly(text: str) -> Optional[float]:
+    """
+    Try to prefer nightly-looking prices (heuristic).
+    Falls back to overall min if no explicit nightly hints found.
+    """
+    nightly_candidates = []
+    for line in (text or "").splitlines():
+        if "Nightly" in line or "nightly" in line or "/night" in line.lower():
+            for m in _MONEY.finditer(line):
+                nightly_candidates.append(float(m.group(1).replace(",", "")))
+    if nightly_candidates:
+        return min(nightly_candidates)
+    # fallback to any price if we didn't find nightly-specific ones
+    return _extract_min_price(text)
+
+
+
 st.set_page_config(page_title="TravelBuddy AI", page_icon="✈️", layout="wide")
 #st.caption("💡 Tip: Toggle Eco Mode in the top bar to get sustainable picks!")
 
@@ -67,18 +99,33 @@ def plan_form():
 
         submitted = st.form_submit_button("Generate Plan")
 
-    if submitted:
-        params = {
+        if submitted:
+            params = {
             "origin": origin, "destination": destination,
             "startDate": str(start), "endDate": str(end),
             "travelers": travelers, "budget": budget,
             "mood": mood, "pace": pace, "econ": st.session_state.eco_mode,
         }
         with st.spinner("Thinking up options..."):
-            st.session_state.results["flights"] = get_flight_data(params)
-            st.session_state.results["hotels"] = get_hotel_data(params)
-            st.session_state.results["itinerary"] = get_itinerary_data(params)
+            flights_md = get_flight_data(params)
+            hotels_md  = get_hotel_data(params)
+
+            # Parse prices from model output
+            min_flight_total = _extract_min_price(flights_md)
+            min_nightly      = _extract_min_nightly(hotels_md)
+
+            # Generate itinerary with price guardrails
+            itin_params = dict(params)
+            itin_params["flight_price_total"] = float(min_flight_total) if min_flight_total else None
+            itin_params["nightly_price_cap"]  = float(min_nightly) if min_nightly else None
+            itinerary_md = get_itinerary_data(itin_params)
+
+            st.session_state.results["flights"]   = flights_md
+            st.session_state.results["hotels"]    = hotels_md
+            st.session_state.results["itinerary"] = itinerary_md
+
         add_points("review", 1)  # small reward for planning
+
 
 def page_home():
     plan_form()

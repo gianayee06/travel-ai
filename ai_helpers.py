@@ -67,15 +67,31 @@ Return a numbered list with: Property name, area, nightly price (USD) and total 
 """
     return generate_text(prompt, temperature=0.6)
 
-def generate_itinerary(origin: str, destination: str, startDate: str, endDate: str,
-                       travelers: int, budget: float, mood: str, pace: str, econ: bool) -> str:
+def generate_itinerary(
+    origin: str, destination: str, startDate: str, endDate: str,
+    travelers: int, budget: float, mood: str, pace: str, econ: bool,
+    flight_price_total: float | None = None,
+    nightly_price_cap: float | None = None
+) -> str:
     eco_line = "Favor low-impact transport (walk/transit/bike) and local/eco experiences where it fits." if econ else ""
-    prompt = f"""Build a concise daily itinerary for a trip.
+    price_rules = []
+    if flight_price_total is not None:
+        price_rules.append(f"- Use flight total ≈ ${flight_price_total:,.0f}. Do not list a lower flight total.")
+    if nightly_price_cap is not None:
+        price_rules.append(f"- Per-night lodging cost must be ≤ ${nightly_price_cap:,.0f}. Do not use a lower hotel rate.")
+    price_rules.append("- If unsure about a price, say 'TBD' rather than making it cheaper than flight/hotel constraints.")
+
+    prompt = f"""
+Build a concise daily itinerary for a trip.
 Origin: {origin} → Destination: {destination}
 Dates: {startDate} to {endDate} | Travelers: {travelers}
-Budget: ${budget:.2f} total | Mood: {mood} | Pace: {pace}
+Budget: ${budget:,.0f} total | Mood: {mood} | Pace: {pace}
 {eco_line}
 
-Format by day (Day 1, Day 2...). For each day include 3–5 key activities/meals with quick tips and rough costs (USD). Keep it scannable.
+Pricing guardrails:
+{chr(10).join(price_rules)}
+
+Format by day (Day 1, Day 2...). For each day include 3–5 key activities/meals with quick tips and rough costs (USD).
+At the end, output a short "Cost Summary" that respects the flight total and hotel nightly cap above.
 """
     return generate_text(prompt, temperature=0.5)
